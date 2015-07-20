@@ -68,16 +68,6 @@ ScriptingEnvironment::ScriptingEnvironment(const std::string &file_name) : file_
     SimpleLogger().Write() << "Using script " << file_name;
 }
 
-// These will be used so we can optionally call source_function, segment_function without breaking other profiles
-void sourceNoOp()
-{
-}
-
-void segmentNoOp(const FixedPointCoordinate *source, const ExternalMemoryNode *target,
-                 const double *distance, InternalExtractorEdge::WeightData *weight)
-{
-}
-
 void ScriptingEnvironment::init_lua_state(lua_State *lua_state)
 {
     typedef double (osmium::Location::*location_member_ptr_type)() const;
@@ -86,7 +76,23 @@ void ScriptingEnvironment::init_lua_state(lua_State *lua_state)
     // open utility libraries string library;
     luaL_openlibs(lua_state);
 
+    const auto sourceNoOp = []
+    {
+    };
+    const auto segmentNoOp = [](const FixedPointCoordinate *, const ExternalMemoryNode *,
+                                const double *, InternalExtractorEdge::WeightData *)
+    {
+    };
+
     luaAddScriptFolderToLoadPath(lua_state, file_name.c_str());
+
+#define LUAOPS                                                                                     \
+    X(+)                                                                                           \
+    X(-)                                                                                           \
+    X(*)                                                                                           \
+    X(/ )                                                                                          \
+    X(<= )                                                                                         \
+    X(< )
 
     // Add our function to the state's global scope
     luabind::module(lua_state)[
@@ -96,8 +102,9 @@ void ScriptingEnvironment::init_lua_state(lua_State *lua_state)
         luabind::def("load_raster_data", loadRasterSource),
         luabind::def("get_raster_data", getRasterDataFromSource),
         luabind::def("get_raster_interpolate", getRasterInterpolateFromSource),
-        luabind::def("source_function", sourceNoOp),
-        luabind::def("segment_function", segmentNoOp),
+        luabind::def<void()>("source_function", sourceNoOp),
+        luabind::def<void(const FixedPointCoordinate *, const ExternalMemoryNode *, const double *,
+                          InternalExtractorEdge::WeightData *)>("segment_function", segmentNoOp),
 
         luabind::class_<std::vector<std::string>>("vector")
             .def("Add", static_cast<void (std::vector<std::string>::*)(const std::string &)>(
@@ -154,32 +161,24 @@ void ScriptingEnvironment::init_lua_state(lua_State *lua_state)
             .property("lon", &FixedPointCoordinate::lon),
         luabind::class_<RasterDatum>("RasterDatum")
             .property("datum", &RasterDatum::datum)
-            .property("has_data", &RasterDatum::has_data),
+            .def("invalid_data", &RasterDatum::get_invalid),
         luabind::class_<double>("double")
             .def(luabind::constructor<>())
             .def(luabind::constructor<double>())
             .def(-luabind::self)
             .def(tostring(luabind::const_self))
-            .def(luabind::const_self + luabind::const_self)
-            .def(luabind::const_self - luabind::const_self)
-            .def(luabind::const_self * luabind::const_self)
-            .def(luabind::const_self / luabind::const_self)
-            .def(luabind::const_self <= luabind::const_self)
-            .def(luabind::const_self < luabind::const_self)
-            .def(luabind::const_self == luabind::const_self)
-            .def(luabind::other<double>() + luabind::const_self)
-            .def(luabind::other<double>() - luabind::const_self)
-            .def(luabind::other<double>() * luabind::const_self)
-            .def(luabind::other<double>() / luabind::const_self)
-            .def(luabind::other<double>() <= luabind::const_self)
-            .def(luabind::other<double>() < luabind::const_self)
-            .def(luabind::const_self + luabind::other<double>())
-            .def(luabind::const_self - luabind::other<double>())
-            .def(luabind::const_self * luabind::other<double>())
-            .def(luabind::const_self / luabind::other<double>())
-            .def(luabind::const_self <= luabind::other<double>())
-            .def(luabind::const_self < luabind::other<double>())
+#define X(op) .def(luabind::const_self op luabind::other<double>())
+                LUAOPS
+#undef X
+#define X(op) .def(luabind::const_self op luabind::const_self)
+                    LUAOPS
+#undef X
+#define X(op) .def(luabind::other<double>() op luabind::const_self)
+                        LUAOPS
+#undef X
     ];
+
+#undef LUAOPS
 
     if (0 != luaL_dofile(lua_state, file_name.c_str()))
     {

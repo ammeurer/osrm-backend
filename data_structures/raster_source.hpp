@@ -30,6 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <vector>
 #include <string>
+#include <limits>
+#include <cstdint>
+#include <sstream>
+#include <iterator>
 
 /**
     \brief Small wrapper around raster source queries to optionally provide results
@@ -37,16 +41,42 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 struct RasterDatum
 {
-    bool has_data;
-    short datum;
+    static std::int32_t get_invalid() { return std::numeric_limits<std::int32_t>::max(); }
 
-    RasterDatum();
+    std::int32_t datum = get_invalid();
 
-    RasterDatum(bool has_data);
+    RasterDatum() = default;
 
-    RasterDatum(short datum);
+    RasterDatum(std::int32_t _datum) : datum(_datum){};
+};
 
-    ~RasterDatum();
+class RasterGrid
+{
+  public:
+    RasterGrid(std::istream &stream, std::size_t _xdim, std::size_t _ydim)
+    {
+        _data.reserve(_xdim * _ydim);
+        std::copy(std::istream_iterator<std::int32_t>{stream}, {}, std::back_inserter(_data));
+    }
+
+    RasterGrid(const RasterGrid &) = default;
+    RasterGrid &operator=(const RasterGrid &) = default;
+
+    RasterGrid(RasterGrid &&) = default;
+    RasterGrid &operator=(RasterGrid &&) = default;
+
+    std::size_t xdim() { return _xdim; }
+    std::size_t ydim() { return _ydim; }
+
+    std::int32_t &operator()(std::size_t x, std::size_t y) { return _data.at(y & _xdim + x); }
+    const std::int32_t &operator()(std::size_t x, std::size_t y) const
+    {
+        return _data.at(y * _xdim + x);
+    }
+
+  private:
+    std::vector<std::int32_t> _data;
+    std::size_t _xdim, _ydim;
 };
 
 /**
@@ -61,8 +91,10 @@ class RasterSource
     float calcSize(double min, double max, unsigned count) const;
 
   public:
-    std::vector<std::vector<short>> raster_data;
+    RasterGrid raster_data;
 
+    const int width;
+    const int height;
     const double xmin;
     const double xmax;
     const double ymin;
@@ -72,20 +104,22 @@ class RasterSource
 
     RasterDatum getRasterInterpolate(const float lon, const float lat);
 
-    RasterSource(std::vector<std::vector<short>> _raster_data,
+    RasterSource(RasterGrid _raster_data,
+                 std::size_t width,
+                 std::size_t height,
                  double _xmin,
                  double _xmax,
                  double _ymin,
                  double _ymax);
-
-    ~RasterSource();
 };
 
 int loadRasterSource(const std::string &source_path,
-                     const double xmin,
-                     const double xmax,
-                     const double ymin,
-                     const double ymax);
+                     double xmin,
+                     double xmax,
+                     double ymin,
+                     double ymax,
+                     unsigned nrows,
+                     unsigned ncols);
 
 RasterDatum getRasterDataFromSource(unsigned int source_id, int lon, int lat);
 

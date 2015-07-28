@@ -28,12 +28,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef RASTER_SOURCE_HPP
 #define RASTER_SOURCE_HPP
 
+#include "../util/osrm_exception.hpp"
+
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/spirit/include/qi_int.hpp>
+#include <boost/spirit/include/qi.hpp>
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/assert.hpp>
+
 #include <vector>
 #include <string>
 #include <limits>
 #include <cstdint>
 #include <sstream>
 #include <iterator>
+#include <iostream>
+#include <ios>
+
 
 /**
     \brief Small wrapper around raster source queries to optionally provide results
@@ -53,10 +65,48 @@ struct RasterDatum
 class RasterGrid
 {
   public:
-    RasterGrid(std::istream &stream, std::size_t _xdim, std::size_t _ydim)
+    RasterGrid(const std::string &filepath, std::size_t _xdim, std::size_t _ydim)
     {
-        _data.reserve(_xdim * _ydim);
-        std::copy(std::istream_iterator<std::int32_t>{stream}, {}, std::back_inserter(_data));
+        xdim = _xdim;
+        ydim = _ydim;
+        _data.reserve(ydim * xdim);
+
+        std::ifstream stream(filepath);
+        if (!stream)
+        {
+            throw osrm::exception("Unable to open raster file.");
+        }
+
+        stream.seekg(0, std::ios_base::end);
+        std::string buffer;
+        buffer.resize(stream.tellg());
+
+        stream.seekg(0, std::ios_base::beg);
+
+        BOOST_ASSERT(buffer.size() > 1);
+        stream.read(&buffer[0], buffer.size());
+
+        boost::algorithm::trim(buffer);
+
+        auto itr = buffer.begin();
+        auto end = buffer.end();
+
+        bool r = false;
+        try
+        {
+            r = boost::spirit::qi::parse(itr, end,
+                +boost::spirit::qi::int_ % +boost::spirit::qi::space,
+                _data);
+        }
+        catch (std::exception const& ex)
+        {
+            throw osrm::exception(std::string("Failed to read from raster source with exception: ") + ex.what());
+        }
+
+        if (!r || itr != end)
+        {
+            throw osrm::exception("Failed to parse raster source correctly.");
+        }
     }
 
     RasterGrid(const RasterGrid &) = default;
@@ -65,18 +115,18 @@ class RasterGrid
     RasterGrid(RasterGrid &&) = default;
     RasterGrid &operator=(RasterGrid &&) = default;
 
-    std::size_t xdim() { return _xdim; }
-    std::size_t ydim() { return _ydim; }
-
-    std::int32_t &operator()(std::size_t x, std::size_t y) { return _data.at(y & _xdim + x); }
-    const std::int32_t &operator()(std::size_t x, std::size_t y) const
+    std::int32_t operator()(std::size_t x, std::size_t y)
     {
-        return _data.at(y * _xdim + x);
+        return _data[y * xdim + x];
+    }
+    const std::int32_t operator()(std::size_t x, std::size_t y) const
+    {
+        return _data[y * xdim + x];
     }
 
   private:
     std::vector<std::int32_t> _data;
-    std::size_t _xdim, _ydim;
+    std::size_t xdim, ydim;
 };
 
 /**
@@ -100,9 +150,9 @@ class RasterSource
     const double ymin;
     const double ymax;
 
-    RasterDatum getRasterData(const float lon, const float lat);
+    RasterDatum getRasterData(const float lon, const float lat) const;
 
-    RasterDatum getRasterInterpolate(const float lon, const float lat);
+    RasterDatum getRasterInterpolate(const float lon, const float lat) const;
 
     RasterSource(RasterGrid _raster_data,
                  std::size_t width,

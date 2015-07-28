@@ -105,6 +105,8 @@ void ScriptingEnvironment::init_lua_state(lua_State *lua_state)
         luabind::def<void()>("source_function", sourceNoOp),
         luabind::def<void(const FixedPointCoordinate *, const ExternalMemoryNode *, const double *,
                           InternalExtractorEdge::WeightData *)>("segment_function", segmentNoOp),
+        luabind::class_<const float>("constants")
+            .enum_("enums")[luabind::value("precision", COORDINATE_PRECISION)],
 
         luabind::class_<std::vector<std::string>>("vector")
             .def("Add", static_cast<void (std::vector<std::string>::*)(const std::string &)>(

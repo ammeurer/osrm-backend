@@ -29,13 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "../util/simple_logger.hpp"
 #include "../util/timing_util.hpp"
-#include "../util/osrm_exception.hpp"
 
 #include <osrm/coordinate.hpp>
-
-#include <boost/assert.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
 
 #include <unordered_map>
 #include <sstream>
@@ -68,7 +63,7 @@ float RasterSource::calcSize(double min, double max, unsigned count) const
 }
 
 // Query raster source for nearest data point
-RasterDatum RasterSource::getRasterData(const float lon, const float lat)
+RasterDatum RasterSource::getRasterData(const float lon, const float lat) const
 {
     if (lon < xmin || lon > xmax || lat < ymin || lat > ymax)
     {
@@ -85,7 +80,7 @@ RasterDatum RasterSource::getRasterData(const float lon, const float lat)
 }
 
 // Query raster source using bilinear interpolation
-RasterDatum RasterSource::getRasterInterpolate(const float lon, const float lat)
+RasterDatum RasterSource::getRasterInterpolate(const float lon, const float lat) const
 {
     if (lon < xmin || lon > xmax || lat < ymin || lat > ymax)
     {
@@ -135,9 +130,8 @@ int loadRasterSource(const std::string &source_path,
     {
         throw osrm::exception("error reading: no such path");
     }
-    boost::filesystem::ifstream reader{source_path.c_str()};
 
-    RasterGrid rasterData{reader, ncols, nrows};
+    RasterGrid rasterData{source_path, ncols, nrows};
 
     RasterSource source{rasterData,
                         static_cast<std::size_t>(ncols),
@@ -146,10 +140,10 @@ int loadRasterSource(const std::string &source_path,
                         xmax,
                         ymin,
                         ymax};
-    LoadedSourcePaths.emplace(source_path, source_id);
-    LoadedSources.emplace_back(source);
-
     TIMER_STOP(loading_source);
+    LoadedSourcePaths.emplace(source_path, source_id);
+    LoadedSources.push_back(std::move(source));
+
     std::cout << "ok, after " << TIMER_SEC(loading_source) << "s" << std::endl;
 
     return source_id;
@@ -163,7 +157,9 @@ RasterDatum getRasterDataFromSource(unsigned int source_id, int lon, int lat)
         throw osrm::exception("error reading: no such loaded source");
     }
 
-    RasterSource found = LoadedSources[source_id];
+    BOOST_ASSERT(LoadedSources.count(source_id) == 1);
+
+    const auto &found = LoadedSources[source_id];
     return found.getRasterData(float(lon) / COORDINATE_PRECISION,
                                float(lat) / COORDINATE_PRECISION);
 }
@@ -176,7 +172,9 @@ RasterDatum getRasterInterpolateFromSource(unsigned int source_id, int lon, int 
         throw osrm::exception("error reading: no such loaded source");
     }
 
-    RasterSource found = LoadedSources[source_id];
+    BOOST_ASSERT(LoadedSources.count(source_id) == 1);
+
+    const auto &found = LoadedSources[source_id];
     return found.getRasterInterpolate(float(lon) / COORDINATE_PRECISION,
                                       float(lat) / COORDINATE_PRECISION);
 }

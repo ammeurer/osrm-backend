@@ -157,8 +157,6 @@ RasterDatum getRasterDataFromSource(unsigned int source_id, int lon, int lat)
         throw osrm::exception("error reading: no such loaded source");
     }
 
-    BOOST_ASSERT(LoadedSources.count(source_id) == 1);
-
     const auto &found = LoadedSources[source_id];
     return found.getRasterData(float(lon) / COORDINATE_PRECISION,
                                float(lat) / COORDINATE_PRECISION);
@@ -171,8 +169,6 @@ RasterDatum getRasterInterpolateFromSource(unsigned int source_id, int lon, int 
     {
         throw osrm::exception("error reading: no such loaded source");
     }
-
-    BOOST_ASSERT(LoadedSources.count(source_id) == 1);
 
     const auto &found = LoadedSources[source_id];
     return found.getRasterInterpolate(float(lon) / COORDINATE_PRECISION,

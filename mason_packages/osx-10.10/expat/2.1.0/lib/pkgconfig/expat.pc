@@ -1,0 +1,11 @@
+prefix=/Users/ammeurer/Hackbright/osrm-backend/mason_packages/osx-10.10/expat/2.1.0
+exec_prefix=/Users/ammeurer/Hackbright/osrm-backend/mason_packages/osx-10.10/expat/2.1.0
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: expat
+Version: 2.1.0
+Description: expat XML parser
+URL: http://www.libexpat.org
+Libs: -L${libdir} -lexpat
+Cflags: -I${includedir}

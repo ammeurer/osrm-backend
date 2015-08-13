@@ -1,0 +1,1 @@
+/Users/ammeurer/Hackbright/osrm-backend/mason_packages/osx-10.10/stxxl/1.4.1/lib/cmake/stxxl/stxxl-version.cmake

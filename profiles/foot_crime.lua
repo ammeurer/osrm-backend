@@ -121,53 +121,79 @@ function source_function ()
     raster_source = load_raster_data(
         "./ascii_density_grid.asc",
         LON_MIN,
-        LAT_MIN,
         LON_MAX,
+        LAT_MIN,
         LAT_MAX,
         NROWS,
         NCOLS)
+    LON_MIN = LON_MIN * constants.precision
+    LON_MAX = LON_MAX * constants.precision
+    LAT_MIN = LAT_MIN * constants.precision
+    LAT_MAX = LAT_MAX * constants.precision
 end
 
 --------------------------------------------------
 -- Called per segment to update edge weights.
 --------------------------------------------------
 function segment_function (source, target, distance, weight)
-    local sourceData = get_raster_data(raster_source, source.lon, source.lat)
-    local targetData = get_raster_data(raster_source, target.lon, target.lat)
-    print("Source Data is " .. sourceData.datum)
-    print("Target Data is " .. targetData.datum)
-    local crime_delta = targetData.datum - sourceData.datum
 
-    local penalize = 0
-
-    -- slope = math.abs(elev_delta / distance)
-    -- if elev_delta < 0 then
-    --     slope = slope / 3
-    -- end
-
-    -- if slope < 0.01 then
-    --     penalize = 0
-    -- elseif slope < 0.05 then
-    --     penalize = 0.25
-    -- elseif slope < 0.1 then
-    --     penalize = 0.65
-    -- else
-    --     penalize = 0.9
-    -- end
-    if crime_delta <= 0 then 
-          penalize = 0
-    elseif crime_delta < 5 then
-          penalize = 0.25
-    elseif crime_delta < 10 then
-          penalize = 0.65
-    else 
-          penalize = 0.9
+    local out_of_bounds = false
+    if source.lon < LON_MIN or source.lon > LON_MAX or
+        source.lat < LAT_MIN or source.lat > LAT_MAX or
+        target.lon < LON_MIN or target.lon > LON_MAX or
+        target.lat < LAT_MIN or target.lat > LAT_MAX then
+          out_of_bounds = true
     end
 
-    print("Crime delta is " .. crime_delta)
-    print("Penalty is " .. penalize)
+    if (out_of_bounds == false) then
+    -- do the whole math part, modify weights
+  
+        local sourceData = get_raster_interpolate(raster_source, source.lon, source.lat)
+        local targetData = get_raster_interpolate(raster_source, target.lon, target.lat)
+        print("Source Data is " .. sourceData.datum)
+        print("Target Data is " .. targetData.datum)
+        local crime_avg = (targetData.datum + sourceData.datum)/2
+        local crime_delta = targetData.datum - sourceData.datum
 
-    weight.speed = weight.speed * (1 - penalize)
+        local penalize = 0
+
+        -- if crime_delta <= 0 then 
+        --   penalize = 0
+        -- elseif crime_delta < 5 then
+        --     penalize = 0.10
+        -- elseif crime_delta < 10 then 
+        --     penalize = 0.25
+        -- elseif crime_delta < 20 then
+        --     penalize = 0.5
+        -- elseif crime_delta < 40 then
+        --     penalize = .66
+        -- elseif crime_delta < 60 then
+        --     penalize = 0.75
+        -- else
+        --     penalize = 0.9
+        -- end
+        if crime_avg <= 0 then 
+              penalize = 0
+        elseif crime_avg < 5 then
+              penalize = 0.10
+        elseif crime_avg < 10 then
+              penalize = 0.25
+        elseif crime_avg < 15 then
+              penalize = 0.5
+        elseif crime_avg < 20 then
+              penalize = 0.66
+        elseif crime_avg < 30 then
+              penalize = 0.75
+        else 
+              penalize = 0.9
+        end
+
+        print("Crime avg is " .. crime_avg)
+        print("Crime delta is " .. crime_delta)
+        print("Penalty is " .. penalize)
+
+        weight.speed = weight.speed * (1 - penalize)
+    end
 end
 
 function way_function (way, result)

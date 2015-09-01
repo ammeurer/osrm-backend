@@ -4,7 +4,7 @@ libdir=${prefix}/lib
 
 Name: libOSRM
 Description: Project OSRM library
-Version: v4.5.0-525-g651ebaa
+Version: v4.5.0-526-g1e299d6
 Requires:
 Libs: -L${libdir} -lOSRM
 Libs.private: -L/Users/ammeurer/Hackbright/osrm-backend/mason_packages/.link/lib -lboost_date_time -lboost_filesystem -lboost_iostreams -lboost_program_options -lboost_regex -lboost_system -lboost_thread -lboost_unit_test_framework
